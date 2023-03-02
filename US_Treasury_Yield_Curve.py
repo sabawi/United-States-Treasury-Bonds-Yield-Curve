@@ -3,7 +3,7 @@
 
 # ### Download and Plot the Latest US Treasury Bonds Yield Curve
 
-# In[1]:
+# In[121]:
 
 
 import pandas as pd
@@ -16,7 +16,7 @@ import numpy as np
 
 # ### Helper Functions
 
-# In[14]:
+# In[122]:
 
 
 def find_crossings(series1, series2):
@@ -59,61 +59,117 @@ def plot_crossing_series(series1,series2,crossed_up,crossed_down):
     ax.grid(which='both')
 
 
-# In[3]:
+# In[123]:
 
 
-this_year = str(datetime.date.today().year)
+last_five_years = [str(int(datetime.date.today().year) - i) for i in range(0, 6)]
+this_year = last_five_years[0]
 
 
 # ### Get Latest Bond Yield Data from US Dept. of Treasury
 
-# In[4]:
+# In[129]:
 
 
-ustd_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/"+this_year+"/all?type=daily_treasury_yield_curve&field_tdr_date_value="+this_year+"&page&_format=csv"
-yield_curve_df = pd.read_csv(ustd_url)
+import time
+
+yield_curves = pd.DataFrame()
+yield_curves_diff = pd.DataFrame()
+
+for i in range(len(last_five_years)):
+    ustd_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/"+last_five_years[i]+"/all?type=daily_treasury_yield_curve&field_tdr_date_value="+last_five_years[i]+"&page&_format=csv"
+    yield_curve_df = pd.read_csv(ustd_url)
+    if('4 Mo' in yield_curve_df.columns):
+        yield_curve_df = yield_curve_df.drop('4 Mo',axis=1)
+    if i == 0: # Save this year data
+        yield_curve_y0_df = yield_curve_df
+        
+    yc_1 = yield_curve_df.copy(deep=True)
+    yc_1['Date'] = pd.to_datetime(yc_1['Date'])
+    yc_1 = yc_1.set_index('Date')
+    
+    for j in range(1,len(yc_1.columns)): 
+        yc_1.iloc[1:,j] = pd.to_numeric(yc_1.iloc[1:,j],errors='coerce') 
+        
+    yield_curves = pd.concat([yield_curves,yc_1])
+    # yield_curves = y.groupby(level=0)
+    
+    yc_1_diff = round(yc_1.pct_change(periods=1)*100,3)
+    yc_1_diff.dropna()
+    
+    yield_curves_diff = pd.concat([yield_curves_diff,yc_1_diff])
+    # yield_curves_diff = yd.groupby()
+    
+    # print(yield_curves)
+    print(".", end='')
+    time.sleep(2)
+    
+
+
+# In[130]:
+
+
+ax = yield_curves.plot(figsize=(20,12),grid=True,xlabel='Dates',ylabel='Yields (%)',
+                  title='US T Bonds Yields for Each Maturity',fontsize=12)
+xtick = pd.date_range( start=yield_curves.index.min( ), end=yield_curves.index.max( ), freq='M' )
+ax.set_xticks( xtick, minor=True )
+ax.grid('on', which='minor', axis='x' )
 
 
 # ### Create Data Series
 
-# In[5]:
+# In[131]:
 
 
-print('Yield Data:')
-# display(yield_curve_df)
-yc_1 = yield_curve_df.copy(deep=True)
-yc_1['Date'] = pd.to_datetime(yc_1['Date'])
-yc_1 = yc_1.set_index('Date')
-# print(yc_1.index)
-for i in range(1,len(yc_1.columns)): 
-    yc_1.iloc[1:,i] = pd.to_numeric(yc_1.iloc[1:,i],errors='coerce') 
-# yc_1.info()
-yc_1_diff = round(yc_1.pct_change(periods=1)*100,3)
-yc_1_diff.dropna()
-yc_1.iloc[:8,4:]
+# print('Yield Data:')
+# # display(yield_curve_df)
+# yc_1 = yield_curve_df.copy(deep=True)
+# yc_1['Date'] = pd.to_datetime(yc_1['Date'])
+# yc_1 = yc_1.set_index('Date')
+# # print(yc_1.index)
+# for i in range(1,len(yc_1.columns)): 
+#     yc_1.iloc[1:,i] = pd.to_numeric(yc_1.iloc[1:,i],errors='coerce') 
+# # yc_1.info()
+# yc_1_diff = round(yc_1.pct_change(periods=1)*100,3)
+# yc_1_diff.dropna()
+yield_curves.iloc[:8,4:]
 
 
 # ### Check Long-End vs. Short End Crossing
 
-# In[15]:
+# In[132]:
 
 
-crossing_series, crossed_up, crossed_down=find_crossings(yc_1['10 Yr'],yc_1['30 Yr'])
+crossing_series, crossed_up, crossed_down=find_crossings(yield_curves['2 Yr'],yield_curves['10 Yr'])
 
-plot_crossing_series(series2=yc_1['10 Yr'],series1=yc_1['30 Yr'],
+plot_crossing_series(series2=yield_curves['2 Yr'],series1=yield_curves['10 Yr'],
                      crossed_up=crossed_up,crossed_down=crossed_down)
+plt.show()
+
+crossing_series, crossed_up, crossed_down=find_crossings(yield_curves['10 Yr'],yield_curves['30 Yr'])
+
+plot_crossing_series(series2=yield_curves['10 Yr'],series1=yield_curves['30 Yr'],
+                     crossed_up=crossed_up,crossed_down=crossed_down)
+plt.show()
+
+
+crossing_series, crossed_up, crossed_down=find_crossings(yield_curves['2 Yr'],yield_curves['30 Yr'])
+
+plot_crossing_series(series2=yield_curves['2 Yr'],series1=yield_curves['30 Yr'],
+                     crossed_up=crossed_up,crossed_down=crossed_down)
+plt.show()
 
 
 # ### Check for other Anomalies in the Long-Short Curves Data
 
-# In[23]:
+# In[133]:
 
 
 # Plot all
-yc_1[['2 Yr','10 Yr']].plot(figsize=(10,6),grid=True,
+yield_curves[['2 Yr','10 Yr']].plot(figsize=(18,6),grid=True,
                             lw=2,xlabel='Date',ylabel='% Yield',
                             title="T-Bonds Yields (%) Comparison")
-yc_1_diff[['2 Yr','10 Yr']].plot(figsize=(10,6),grid=True,
+yield_curves_diff[['2 Yr','10 Yr']].plot(figsize=(18,6),grid=True,
                                  lw=2,xlabel='Date',ylabel='Changes (%) in Yields',
                                  title="Changes (%) in T-Bonds Yields")
 
@@ -122,15 +178,15 @@ plt.show()
 
 # ### T-Bonds Vs. S&P 500 
 
-# In[24]:
+# In[134]:
 
 
-fig, ax = plt.subplots(2,1,figsize=(10,6),sharex=True)
-yc_1[['5 Yr','10 Yr','30 Yr']].plot(ax=ax[0],grid=True,
+fig, ax = plt.subplots(2,1,figsize=(18,12),sharex=True)
+yield_curves[['5 Yr','10 Yr','30 Yr']].plot(ax=ax[0],grid=True,
                             lw=2,xlabel='Date',ylabel='% Yield',
                             title="T-Bonds Yields (%) Comparison")
 
-start_date = yc_1.index[-1].strftime("%Y-%m-%d")
+start_date = yield_curves.index[-1].strftime("%Y-%m-%d")
 df_sp500 = yf.Ticker('^GSPC').history(start=start_date,interval='1d')['Close']
 
 
@@ -140,12 +196,25 @@ df_sp500.plot(ax=ax[1],grid=True,
 plt.show()
 
 
+# In[140]:
+
+
+corr_with_bond = yield_curves.tz_localize('America/New_York').corrwith(df_sp500)
+# corr_with_bond.values
+corr_with_bond_df = pd.DataFrame({'Maturities':corr_with_bond.index,'Correlations':corr_with_bond.values})
+print("S&P 500 Correlation with Bond Yields :")
+print(corr_with_bond_df)
+corr_with_bond_df.plot.bar(x='Maturities',y='Correlations',figsize=(12,4),
+                           title="S&P 500 Prices Correlation with T Bond Yields",ylabel="Corr with S&P 500",
+                           xlabel='T Bonds by Maturity',grid=True)
+
+
 # ### Re-Formating and Cleaning the Data into a DataFrame
 
-# In[26]:
+# In[141]:
 
 
-yield_curve_df2 = yield_curve_df.reset_index()
+yield_curve_df2 = yield_curve_y0_df.reset_index()
 yield_curve_df2 = yield_curve_df2.T
 yield_curve_df2 = yield_curve_df2.reset_index()
 
@@ -154,7 +223,7 @@ yield_curve_df2.iloc[0,0] = 'Maturity'
 cols = [str(x) for x in yield_curve_df2.iloc[0,:]]
 
 
-# In[27]:
+# In[142]:
 
 
 yield_curve_df2.columns = cols
@@ -167,7 +236,7 @@ yield_curve_df2
 
 # ### Plot the Most Recent Yield Curves
 
-# In[28]:
+# In[143]:
 
 
 longest_n_maturities = 8   # For ALL maturities set = len(yield_curve_df2)
@@ -190,7 +259,7 @@ fig.update_layout(
 fig.show()
 
 
-# In[25]:
+# In[144]:
 
 
 yield_curve_df2.iloc[-8:,:5].plot(figsize=(20,10),title="US Treasury Bonds Yield Curve",ylabel='% Yield',
